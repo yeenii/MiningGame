@@ -20,8 +20,19 @@ public class ProcessingMachine : MonoBehaviour
     [Tooltip("기계가 광석 1개를 가공하는 데 걸리는 시간")]
     public float processingTime = 0.5f;
 
+
+    [Header("Product Zone Settings (Output)")]
+    [Tooltip("가공된 수갑이 쌓일 기준점 (빈 오브젝트)")]
+    public Transform productZone;
+    [Tooltip("완성된 수갑 프리팹")]
+    public GameObject productPrefab;
+    [Tooltip("수갑이 쌓일 때 아이템 간의 높이(Y축)")]
+    public float productHeight = 3.0f; // 수갑은 광석보다 납작할 수 있으므로 별도 제어
+
     // 바닥에 쌓인 광석들을 관리하는 리스트
     private List<GameObject> groundItems = new List<GameObject>();
+    //가공된 수갑 관리 리스트
+    private List<GameObject> productItems = new List<GameObject>();
 
     // 플레이어가 내려놓는 루틴을 제어하는 변수
     private Coroutine playerDropRoutine;
@@ -36,9 +47,9 @@ public class ProcessingMachine : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            Debug.Log("바닥인식");
+            //Debug.Log("바닥인식");
             PlayerInventory inventory = other.GetComponent<PlayerInventory>();
-            Debug.Log(inventory);
+            //Debug.Log(inventory);
             Animator playerAnim = other.GetComponentInChildren<Animator>();
 
             if (inventory != null)
@@ -97,7 +108,7 @@ public class ProcessingMachine : MonoBehaviour
     {
         while (true)
         {
-            // 바닥에 광석이 하나라도 도착했다면!
+            //1. 바닥에 광석이 하나라도 도착했다면
             if (groundItems.Count > 0)
             {
                 // 바닥 스택의 맨 위(마지막 인덱스) 광석을 가져옴
@@ -119,6 +130,23 @@ public class ProcessingMachine : MonoBehaviour
 
                 // 기계가 하나를 가공하는 동안 대기 (이 시간 동안은 바닥에 광석이 더 쌓여도 가져가지 않음)
                 yield return new WaitForSeconds(processingTime);
+
+                // 2. 가공 완료 후 수갑 생성 및 생산 구역에 스태킹
+                if (productZone != null && productPrefab != null)
+                {
+                 
+                    GameObject newProduct = Instantiate(productPrefab, productZone);
+
+                    // 현재 쌓인 수갑 개수만큼 위(Y축)로 차곡차곡 정렬
+                    int currentProductCount = productItems.Count;
+                    newProduct.transform.localPosition = new Vector3(0f, currentProductCount * productHeight, 0f);
+                    newProduct.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f); //수갑 rotation 조정 (.fbx 형식 때문에 코드로 조정)
+                    newProduct.transform.localScale = new Vector3(20f, 20f, 4000f); //수갑 scale 조정
+
+                    // 생산품 리스트에 추가하여 관리
+                    productItems.Add(newProduct);
+                    Debug.Log($"가공한 수갑 개수: {productItems.Count}");
+                }
             }
             else
             {
@@ -126,5 +154,27 @@ public class ProcessingMachine : MonoBehaviour
                 yield return null;
             }
         }
+    }
+
+    //---플레이어 손에 수갑 쌓기 로직---
+
+    // 현재 창고에 수갑이 남아있는지 확인
+    public bool HasProducts()
+    {
+        return productItems.Count > 0;
+    }
+
+    // 창고 맨 위에서 수갑을 하나 꺼내서 반환
+    public GameObject PopProduct()
+    {
+        if (!HasProducts()) return null;
+
+        int lastIndex = productItems.Count - 1;
+        GameObject topProduct = productItems[lastIndex];
+
+        productItems.RemoveAt(lastIndex);
+        topProduct.transform.SetParent(null); // 부모 관계 해제
+
+        return topProduct;
     }
 }

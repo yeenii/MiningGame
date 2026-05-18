@@ -11,7 +11,15 @@ public class PlayerInventory : MonoBehaviour
     [Tooltip("등 뒤에 쌓일 작은 광석(석탄) 프리팹을 연결하세요.")]
     public GameObject stackedItemPrefab;
 
-    private List<GameObject> stackedItems = new List<GameObject>();
+
+    [Header("Product Hand Settings")]          // 수갑 손에 쌓기
+    public Transform handProductPoint;
+    public float handProductHeight = 0.5f;
+    public Animator animator; // 플레이어 애니메이터
+
+    private List<GameObject> stackedItems = new List<GameObject>(); //등에 광석 쌓기
+
+    private List<GameObject> handProducts = new List<GameObject>(); //손에 수갑 쌓기
 
     // 인벤토리에 여유 공간이 있는지 확인
     public bool CanCollect()
@@ -63,5 +71,48 @@ public class PlayerInventory : MonoBehaviour
         topItem.transform.SetParent(null);
 
         return topItem; // 꺼낸 광석 오브젝트를 가공소 스크립트로 넘겨줌
+    }
+
+    //---손에 수갑 쌓기 로직---
+
+    public void AddProductToHand(GameObject product)
+    {
+        // 손 기준점의 자식으로 편입 (스케일 왜곡 방지를 위해 false)
+        product.transform.SetParent(handProductPoint, false);
+
+        int index = handProducts.Count;
+        product.transform.localPosition = new Vector3(0f, index * handProductHeight, 0f);
+
+        // 완벽한 각도와 스케일(두께 4000f) 유지
+        product.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+        product.transform.localScale = new Vector3(20f, 20f, 20f);
+
+        handProducts.Add(product);
+
+        // 손에 물건이 생기면 들기 애니메이션 ON
+        if (animator != null) animator.SetBool("IsCarrying", true);
+    }
+
+    //-- 플레이어 손에 들고 있는 수갑 데스크로 넘겨주는 함수 --
+    public GameObject PopProductFromHand()
+    {
+        // 손에 수갑이 하나도 없으면 멈춤
+        if (handProducts.Count == 0) return null;
+
+        // 리스트의 맨 마지막(제일 위)에 있는 수갑을 선택
+        int lastIndex = handProducts.Count - 1;
+        GameObject topProduct = handProducts[lastIndex];
+
+        // 리스트에서 제거하고 플레이어 손에서 부모 관계를 끊음
+        handProducts.RemoveAt(lastIndex);
+        topProduct.transform.SetParent(null);
+
+        // ★ 디테일: 손에 든 수갑을 다 내려놔서 0개가 되면 '들기' 애니메이션 끄기
+        if (handProducts.Count == 0 && animator != null)
+        {
+            animator.SetBool("IsCarrying", false);
+        }
+
+        return topProduct; // 꺼낸 수갑을 테이블(HandcuffDesk)로 전달
     }
 }
